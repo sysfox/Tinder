@@ -39,9 +39,17 @@ async def root():
     """返回应用的系统信息"""
     return get_system_info()
 
+
 # 尝试启动服务器
 if __name__ == "__main__":
     try:
-        uvicorn.run(app="server:app", host='0.0.0.0', port=1912, reload=True)
+        uvicorn.run(
+            app="server:app",
+            host='0.0.0.0',
+            port=1912,
+            reload=True,
+            access_log=False,
+            log_level="warning"
+        )
     except Exception as e:
         print(f"Error starting server: {e}")
