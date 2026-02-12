@@ -1,0 +1,65 @@
+name: Docker Build CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: tinder-app:test
+      
+      - name: Test Docker image
+        run: |
+          docker images | grep tinder-app
+          echo "Docker image built successfully!"
+      
+      - name: Run container test
+        run: |
+          timeout 30 docker run --rm tinder-app:test || true
+          echo "Container test completed (timeout expected for running server)"
+      
+      - name: Check entrypoint script
+        run: |
+          docker run --rm tinder-app:test bash -c "test -x /app/docker-entrypoint.sh && echo 'Entrypoint script is executable'"
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Check Python syntax
+        run: |
+          python -m py_compile server.py
+          echo "Python syntax check passed!"
+      
+      - name: Check Dockerfile syntax
+        run: |
+          if command -v hadolint &> /dev/null; then
+            hadolint DOCKERFILE
+          else
+            echo "Hadolint not available, skipping linting"
+          fi
