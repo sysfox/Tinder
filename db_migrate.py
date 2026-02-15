@@ -53,6 +53,38 @@ def create_migration_history_table(conn):
     finally:
         cursor.close()
 
+# 执行迁移脚本
+# 导入migration列表
+from core.db_migration.migration_history import migration_history
+
+def execute_migrations(conn):
+    """执行迁移脚本"""
+    for migration in migration_history:
+        if migration not in os.listdir('core/db_migration/SQL'):
+            print(f"❌ 迁移脚本不存在: {migration}")
+            continue
+        cursor = conn.cursor()
+        try:
+            # 检查该迁移是否已执行
+            check_sql = "SELECT COUNT(*) FROM migration_history WHERE migration_name = %s;"
+            cursor.execute(check_sql, (migration,))
+            count = cursor.fetchone()[0]
+            if count == 0:
+                # 执行迁移脚本
+                with open(f'core/db_migration/SQL/{migration}', 'r') as f:
+                    sql_script = f.read()
+                cursor.execute(sql_script)
+                # 记录迁移历史
+                insert_sql = "INSERT INTO migration_history (migration_name) VALUES (%s);"
+                cursor.execute(insert_sql, (migration,))
+                conn.commit()
+                print(f"✅ 迁移脚本执行成功: {migration}")
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ 执行迁移脚本失败: {migration}, 错误: {e}")
+        finally:
+            cursor.close()
+
 # 主函数
 if __name__ == "__main__":
     try:
@@ -61,6 +93,9 @@ if __name__ == "__main__":
         
         # 创建migration_history表
         create_migration_history_table(conn)
+
+        # 执行迁移脚本
+        execute_migrations(conn)
         
         # 关闭连接
         conn.close()
