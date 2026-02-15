@@ -16,5 +16,5 @@ CREATE TABLE IF NOT EXISTS users (
     invited_by TEXT,
     views INTEGER DEFAULT 0,
     other_info JSONB,
-    is_verified BOOLEAN,
+    is_verified BOOLEAN
 );
