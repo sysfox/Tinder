@@ -23,21 +23,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 获取系统信息
-def get_system_info() -> Dict[str, Any]:
-    """获取应用的系统信息"""
-    return {
-        "name": "Tinder",
-        "system_time": datetime.now().isoformat(),
-        "system_version": platform.platform()
-    }
-
-# 根路由
-@app.get("/")
-async def root():
-    """返回应用的系统信息"""
-    return get_system_info()
+# 导入模块
+from modules.index.index import app as index_router
+# 导入路由
+app.include_router(index_router)
 
 
 # 尝试启动服务器
@@ -46,6 +35,7 @@ print(f"===================================================")
 print(f"Python版本: {platform.python_version()}")
 print(f"当前APP_ENV: {os.getenv('APP_ENV', 'not set')}")
 print(f"===================================================")
+
 if __name__ == "__main__":
     try:
         # 根据环境变量设置日志级别
