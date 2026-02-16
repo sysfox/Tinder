@@ -1,4 +1,19 @@
 migration_history =[
     "initial_migration_user.sql",
-    "initial_wall_sayings.sql"
+    "initial_wall_sayings.sql",
+    "initial_tags.sql",
+    "initial_relations.sql",
+    "initial_songs.sql",
+    "initial_song_arrangements.sql",
+    "initial_wall_looking_for.sql",
+    "initial_vote.sql",
+    "initial_comments.sql",
+    "initial_stores_and_restaurants.sql",
+    "initial_system_logs.sql",
+    "initial_personal_logs.sql",
+    "initial_request_logs.sql",
+    "initial_favourites.sql",
+    "initial_system_reports.sql",
+    "initial_tasks.sql",
+    "initial_tokens.sql"
 ]
