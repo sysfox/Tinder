@@ -13,11 +13,7 @@
 - [DAO 层使用](#dao-层使用)
   - [通用 CRUD](#通用-crud)
   - [特殊 DAO 说明](#特殊-dao-说明)
-- [ORM 层使用](#orm-层使用)
-  - [背景与目标](#背景与目标)
-  - [目录结构](#目录结构)
-  - [UsersRepository 示例](#usersrepository-示例)
-  - [开发规范](#开发规范)
+- [开发规范](#开发规范)
 - [表结构一览](#表结构一览)
 - [ER 图](#er-图)
 
@@ -39,27 +35,28 @@ REDIS_URL=redis://localhost:6379/0
 
 ## 数据库连接管理
 
-PostgreSQL 连接由 SQLAlchemy Engine 统一管理，应用启动时自动验证连接，停止时调用 `dispose_engine()` 关闭连接池。Redis 连接管理器独立运行。
+PostgreSQL 连接由 SQLAlchemy Engine 统一管理，ORM 基础设施位于 `core/database/connection/db.py`。
+应用启动时自动验证连接，停止时调用 `dispose_engine()` 关闭连接池。Redis 连接管理器独立运行。
 
-### PostgreSQL（ORM 引擎）
+### PostgreSQL
 
 ```python
-from core.database.orm.session import get_session
+from core.database.connection.db import get_session
 
 with get_session() as session:
     # 在 session 内执行 ORM 操作
     ...
 ```
 
-| 函数/方法 | 说明 |
-|-----------|------|
-| `get_session()` | 上下文管理器，提供线程安全的 SQLAlchemy Session |
+| 函数 | 说明 |
+|------|------|
+| `get_session()` | 上下文管理器，提供自动提交/回滚的 SQLAlchemy Session |
 | `dispose_engine()` | 释放连接池（由应用 lifespan 自动调用） |
 
 ### Redis
 
 ```python
-from core.helper.database.connection.redis import redis_conn
+from core.database.connection.redis import redis_conn
 
 # 获取 redis-py 客户端
 client = redis_conn.get_client()
@@ -77,14 +74,28 @@ value = client.get("key")
 
 ## DAO 层使用
 
-所有 DAO 位于 `core/database/dao/`，继承自 `core/database/dao/base.py` 的 `BaseDAO`，底层使用 **SQLAlchemy 2.x ORM**。
+所有 DAO 位于 `core/database/dao/`，每个文件同时包含 **ORM 模型定义** 和 **DAO 类**，继承自 `BaseDAO`。底层使用 **SQLAlchemy 2.x ORM**，无手写 SQL。
+
+项目目录结构：
+
+```
+core/database/
+├── connection/
+│   ├── db.py      # ORM 基础设施：Base、get_session()、dispose_engine()
+│   └── redis.py   # Redis 连接管理
+└── dao/
+    ├── base.py    # BaseDAO（通用 CRUD，子类设置 MODEL 即可）
+    ├── users.py   # User 模型 + UsersDAO
+    ├── tokens.py  # Token 模型 + TokensDAO
+    └── ...        # 每个表一个文件（模型 + DAO 合一）
+```
 
 ### 通用 CRUD
 
 以 `UsersDAO` 为例：
 
 ```python
-from core.dao.users import UsersDAO
+from core.database.dao.users import UsersDAO
 
 dao = UsersDAO()
 
@@ -142,43 +153,38 @@ success = dao.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 ---
 
-## ORM 层
+## 开发规范
 
-所有 DAO 已全量迁移至 SQLAlchemy 2.x ORM，原 psycopg2 手写 SQL 层已移除。
+新增表/功能时：
 
-### 目录结构
-
-```
-core/database/orm/
-├── __init__.py
-├── base.py        # DeclarativeBase + Engine/Session 工厂
-├── session.py     # get_session() 上下文管理器、dispose_engine()
-└── models/        # 每个表对应一个 ORM 模型文件
-    ├── users.py
-    ├── tokens.py
-    ├── comments.py
-    ├── favourites.py
-    ├── illegal_requests.py
-    ├── personal_logs.py
-    ├── relations.py
-    ├── request_logs.py
-    ├── song_arrangements.py
-    ├── songs.py
-    ├── stores_and_restaurants.py
-    ├── system_logs.py
-    ├── system_reports.py
-    ├── tags.py
-    ├── tasks.py
-    ├── vote.py
-    ├── wall_looking_for.py
-    └── wall_sayings.py
-```
-
-### 开发规范
-
-1. **新表必须先写 ORM 模型**：在 `core/database/orm/models/` 中新增模型文件，字段定义与 SQL 迁移文件保持一致。
-2. **新 DAO 继承 BaseDAO**：在 `core/database/dao/` 中新增 DAO 文件，设置 `MODEL` 属性指向对应的 ORM 模型类。
+1. **在 `core/database/dao/` 中新建 DAO 文件**，在同一文件内定义 ORM 模型类（继承 `Base`）和 DAO 类（继承 `BaseDAO`，设置 `MODEL` 属性）。
+2. **字段定义与 SQL 迁移文件保持一致**：在 `core/database/migrations/SQL/` 中同步新增迁移文件。
 3. **Session 生命周期**：始终通过 `get_session()` 上下文管理器使用 Session，禁止在函数外持有 Session 引用。
+
+新建 DAO 示例：
+
+```python
+# core/database/dao/example.py
+
+from sqlalchemy import Integer, Text, func
+from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.orm import Mapped, mapped_column
+
+from core.database.connection.db import Base
+from core.database.dao.base import BaseDAO
+
+
+class Example(Base):
+    __tablename__ = "example"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uuid: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    # ... 其他字段
+
+
+class ExampleDAO(BaseDAO):
+    MODEL = Example
+```
 
 ---
 
@@ -211,3 +217,4 @@ core/database/orm/
 
 - `database-schema.excalidraw` – 数据库表结构 ER 图（可在 [excalidraw.com](https://excalidraw.com) 打开）
 - `../db-migration.excalidraw` – 数据库迁移流程图
+

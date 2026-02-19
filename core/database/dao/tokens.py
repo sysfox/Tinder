@@ -1,10 +1,34 @@
+"""tokens 表的数据访问对象（含 ORM 模型定义）。"""
+
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Index, Integer, Text, func, or_, select
+from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.orm import Mapped, mapped_column
 
+from core.database.connection.db import Base, get_session
 from core.database.dao.base import BaseDAO
-from core.database.orm.models.tokens import Token
-from core.database.orm.session import get_session
+
+
+class Token(Base):
+    """tokens 表的 ORM 模型。"""
+
+    __tablename__ = "tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uuid: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    belong_to: Mapped[str] = mapped_column(Text, nullable=False)
+    permission: Mapped[str] = mapped_column(Text, nullable=False)
+    assigner: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, server_default=func.now())
+    expired_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    current_status: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        Index("idx_tokens_belong_to", "belong_to"),
+        Index("idx_tokens_expired_at", "expired_at"),
+    )
 
 
 class TokensDAO(BaseDAO):
@@ -31,4 +55,5 @@ class TokensDAO(BaseDAO):
                 )
             )
             return [self._to_dict(o) for o in objs]
+
 

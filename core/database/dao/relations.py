@@ -1,10 +1,29 @@
+"""relations 表的数据访问对象（含 ORM 模型定义）。
+
+relations 表没有独立的 uuid 主键，使用自增 id 作为主键。
+"""
+
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Integer, Text, func, select
+from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.orm import Mapped, mapped_column
 
+from core.database.connection.db import Base, get_session
 from core.database.dao.base import BaseDAO
-from core.database.orm.models.relations import Relation
-from core.database.orm.session import get_session
+
+
+class Relation(Base):
+    """relations 表的 ORM 模型。"""
+
+    __tablename__ = "relations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tags_uuid: Mapped[str] = mapped_column(Text, nullable=False)
+    related_uuid: Mapped[str] = mapped_column(Text, nullable=False)
+    relation_type: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, server_default=func.now())
 
 
 class RelationsDAO(BaseDAO):
@@ -60,4 +79,5 @@ class RelationsDAO(BaseDAO):
                 return False
             session.delete(obj)
             return True
+
 

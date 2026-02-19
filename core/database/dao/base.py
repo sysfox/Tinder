@@ -2,8 +2,7 @@ from typing import Any, ClassVar, Type
 
 from sqlalchemy import select
 
-from core.database.orm.base import Base
-from core.database.orm.session import get_session
+from core.database.connection.db import Base, get_session
 
 
 class BaseDAO:
@@ -111,5 +110,6 @@ class BaseDAO:
                 return False
             session.delete(obj)
             return True
+
 
 

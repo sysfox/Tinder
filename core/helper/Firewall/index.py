@@ -85,8 +85,8 @@ def _resolve_user_from_token(token: str) -> str:
     try:
         from sqlalchemy import func, or_, select
 
-        from core.database.orm.models.tokens import Token
-        from core.database.orm.session import get_session
+        from core.database.connection.db import get_session
+        from core.database.dao.tokens import Token
 
         with get_session() as session:
             stmt = select(Token.belong_to).where(
@@ -117,8 +117,8 @@ def _record_illegal_request(
 ) -> None:
     """将违规请求写入 illegal_requests 表，失败时仅打印日志不中断流程。"""
     try:
-        from core.database.orm.models.illegal_requests import IllegalRequest
-        from core.database.orm.session import get_session
+        from core.database.connection.db import get_session
+        from core.database.dao.illegal_requests import IllegalRequest
 
         record = IllegalRequest(
             uuid=str(uuid_lib.uuid4()),
