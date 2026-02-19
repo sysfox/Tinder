@@ -12,6 +12,35 @@ jobs:
     permissions:
       contents: read
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: tinder
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/tinder
+      REDIS_URL: redis://localhost:6379/0
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,6 +52,9 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Run database migrations
+        run: python db_migrate.py
 
       - name: Run tests
         run: python -m pytest test/ -v
