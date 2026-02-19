@@ -57,7 +57,7 @@ def create_migration_history_table(conn):
 
 def execute_migrations(conn):
     # 导入migration列表
-    from core.database.migrations.history import migration_history
+    from core.database.migrations.migration_history import migration_history
     """执行迁移脚本"""
     for migration in migration_history:
         if migration not in os.listdir('core/database/migrations/SQL'):
