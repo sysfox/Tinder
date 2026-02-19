@@ -13,6 +13,11 @@
 - [DAO 层使用](#dao-层使用)
   - [通用 CRUD](#通用-crud)
   - [特殊 DAO 说明](#特殊-dao-说明)
+- [ORM 层使用](#orm-层使用)
+  - [背景与目标](#背景与目标)
+  - [目录结构](#目录结构)
+  - [UsersRepository 示例](#usersrepository-示例)
+  - [开发规范](#开发规范)
 - [表结构一览](#表结构一览)
 - [ER 图](#er-图)
 
@@ -134,6 +139,70 @@ success = dao.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 |------|------|
 | `find_by_belong_to(belong_to)` | 查询指定用户的所有 token |
 | `find_active_by_belong_to(belong_to)` | 查询指定用户的所有未过期 token |
+
+---
+
+## ORM 层使用
+
+### 背景与目标
+
+现有 DAO 层基于 psycopg2 + 手写 SQL，在功能迭代加速的背景下，维护成本逐渐增加。为此，项目引入 **SQLAlchemy 2.x ORM**，目标如下：
+
+- 通过声明式模型替代手写 SQL，提升可维护性与类型安全性。
+- 借助 ORM 的懒加载、关联关系等特性，降低复杂查询的编写难度。
+- 渐进式迁移：旧 DAO 保留不变，新功能优先使用 ORM；待全量迁移完成后再统一移除旧 DAO。
+
+### 目录结构
+
+```
+core/database/orm/
+├── __init__.py
+├── base.py            # DeclarativeBase + Engine/Session 工厂
+├── session.py         # 上下文管理器 get_session()
+├── models/
+│   ├── __init__.py
+│   ├── users.py       # User ORM 模型
+│   └── tokens.py      # Token ORM 模型
+└── repositories/
+    ├── __init__.py
+    └── users.py       # UsersRepository（ORM 版 DAO）
+```
+
+### UsersRepository 示例
+
+```python
+from core.database.orm.repositories.users import UsersRepository
+
+repo = UsersRepository()
+
+# 查询单条（按 uuid）
+user = repo.get_by_uuid("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+
+# 分页查询
+users = repo.find_all(limit=20, offset=0)
+
+# 插入
+new_user = repo.create({
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "nickname": "张三",
+    "user_role": "user",
+})
+
+# 更新
+updated = repo.update("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", {"nickname": "李四"})
+
+# 删除
+success = repo.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+```
+
+所有方法的返回格式（`dict[str, Any]`）与现有 psycopg2 DAO 保持一致，便于平滑迁移。
+
+### 开发规范
+
+1. **新表必须先写 ORM 模型**：在 `core/database/orm/models/` 中新增模型文件，字段定义与 SQL 迁移文件保持一致。
+2. **新功能使用 Repository**：在 `core/database/orm/repositories/` 中新增 Repository 类，提供业务方法。
+3. **旧 DAO 暂不删除**：现有 psycopg2 DAO 继续正常工作，直到全量 ORM 迁移完成。
+4. **Session 生命周期**：始终通过 `get_session()` 上下文管理器使用 Session，禁止在函数外持有 Session 引用。
 
 ---
 

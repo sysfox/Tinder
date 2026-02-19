@@ -60,6 +60,13 @@ docker run -p 1912:1912 tinder
 └── requirements.txt # 项目依赖
 ```
 
+## ORM 支持
+
+项目从 psycopg2 + 手写 SQL 逐步迁移到 **SQLAlchemy 2.x ORM**，详情见 [数据库文档](docs/database/readme.md#orm-层使用)。
+
+- ORM 基础设施位于 `core/database/orm/`，包含声明式基类、Session 管理和示例模型。
+- 新表 / 新功能应优先使用 ORM，旧 DAO 暂时保留，不影响现有行为。
+
 ## API 文档
 
 启动服务后访问 `http://localhost:1912/docs` 查看Swagger文档
