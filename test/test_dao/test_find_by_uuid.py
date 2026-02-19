@@ -1,0 +1,12 @@
+"""Tests for BaseDAO.find_by_uuid()."""
+
+
+def test_find_existing(dao):
+    dao.create({"uuid": "u-1", "name": "Alice"})
+    result = dao.find_by_uuid("u-1")
+    assert result is not None
+    assert result["name"] == "Alice"
+
+
+def test_find_nonexistent_returns_none(dao):
+    assert dao.find_by_uuid("no-such-uuid") is None
