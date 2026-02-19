@@ -8,7 +8,7 @@ from datetime import datetime
 import platform
 from typing import Dict, Any
 from core.helper.ContainerCustomLog.index import custom_log
-from core.helper.Firewall.index import FirewallMiddleware
+from core.middleware.firewall.index import FirewallMiddleware
 from core.database.connection.redis import redis_conn
 from core.database.connection.db import dispose_engine, get_session
 
