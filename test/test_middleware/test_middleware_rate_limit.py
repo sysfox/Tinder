@@ -11,6 +11,7 @@ _PATCH_RESOLVE = "core.middleware.firewall.middleware.FirewallMiddleware._resolv
 
 
 def test_rate_limit_returns_403(firewall_client):
+    """防火墙：超过速率限制的请求被拒绝，返回 403"""
     with (
         patch(_PATCH_IS_BANNED, return_value=False),
         patch(_PATCH_IS_RATE, return_value=True),

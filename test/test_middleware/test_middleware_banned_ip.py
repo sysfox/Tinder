@@ -11,6 +11,7 @@ _PATCH_RESOLVE = "core.middleware.firewall.middleware.FirewallMiddleware._resolv
 
 
 def test_banned_ip_returns_403(firewall_client):
+    """防火墙：封禁 IP 的请求被拒绝，返回 403"""
     with patch(_PATCH_IS_BANNED, return_value=True):
         resp = firewall_client.get("/ping")
     assert resp.status_code == 403
@@ -18,6 +19,7 @@ def test_banned_ip_returns_403(firewall_client):
 
 
 def test_ip_banned_when_threshold_reached(firewall_client):
+    """防火墙：违规次数达到阈值时自动封禁 IP"""
     with (
         patch(_PATCH_IS_BANNED, return_value=False),
         patch(_PATCH_IS_RATE, return_value=True),

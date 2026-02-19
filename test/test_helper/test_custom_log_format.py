@@ -15,15 +15,18 @@ def _capture(level: str, message: str) -> str:
 
 
 def test_case_insensitive_level():
+    """级别名称不区分大小写（success → SUCCESS）"""
     output = _capture("success", "lower case")
     assert "[SUCCESS]" in output
 
 
 def test_timestamp_present():
+    """输出中包含 YYYY-MM-DD HH:MM:SS 格式时间戳"""
     output = _capture("SUCCESS", "ts test")
     assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", output)
 
 
 def test_empty_message():
+    """消息为空时仍输出正确的级别标签"""
     output = _capture("SUCCESS", "")
     assert "[SUCCESS]" in output

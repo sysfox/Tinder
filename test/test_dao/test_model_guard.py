@@ -6,6 +6,7 @@ from core.database.dao.base import BaseDAO
 
 
 def test_missing_model_raises():
+    """未设置 MODEL 属性的 DAO 抛出 NotImplementedError"""
     class BadDAO(BaseDAO):
         pass
 

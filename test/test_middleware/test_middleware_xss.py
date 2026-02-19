@@ -11,6 +11,7 @@ _PATCH_RESOLVE = "core.middleware.firewall.middleware.FirewallMiddleware._resolv
 
 
 def test_xss_in_referer_returns_403(firewall_client):
+    """防火墙：Referer 头中含 XSS 攻击特征时被拒绝，返回 403"""
     # The middleware also inspects the Referer header for injection payloads.
     with (
         patch(_PATCH_IS_BANNED, return_value=False),
