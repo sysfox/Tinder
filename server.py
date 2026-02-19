@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 import platform
 from typing import Dict, Any
+from core.helper.ContainerCustomLog.index import custom_log
 
 # 加载环境变量
 load_dotenv()
@@ -30,11 +31,11 @@ app.include_router(index_router)
 
 
 # 尝试启动服务器
-print("Tinder服务器启动中...")
-print(f"===================================================")
-print(f"Python版本: {platform.python_version()}")
-print(f"当前APP_ENV: {os.getenv('APP_ENV', 'not set')}")
-print(f"===================================================")
+custom_log("SUCCESS", "Tinder服务器启动中...")
+custom_log("SUCCESS", f"===================================================")
+custom_log("SUCCESS", f"Python版本: {platform.python_version()}")
+custom_log("SUCCESS", f"当前APP_ENV: {os.getenv('APP_ENV', 'not set')}")
+custom_log("SUCCESS", f"===================================================")
 
 if __name__ == "__main__":
     try:
@@ -51,4 +52,4 @@ if __name__ == "__main__":
             log_level=log_level
         )
     except Exception as e:
-        print(f"Error starting server: {e}")
+        custom_log("ERROR", f"Error starting server: {e}")
