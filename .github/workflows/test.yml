@@ -51,10 +51,26 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          echo "::group::📦 Installing Python dependencies"
+          pip install -r requirements.txt
+          echo "::endgroup::"
 
       - name: Run database migrations
-        run: python db_migrate.py
+        run: |
+          echo "::group::🗄️ Running database migrations"
+          python db_migrate.py
+          echo "::endgroup::"
 
       - name: Run tests
-        run: python -m pytest test/ -v
+        run: |
+          echo "::group::🧪 Running pytest"
+          python -m pytest test/ -v --color=yes --tb=short \
+            --junitxml=test-results.xml
+          echo "::endgroup::"
+
+      - name: Publish test summary
+        if: always()
+        uses: test-summary/action@v2
+        with:
+          paths: test-results.xml
