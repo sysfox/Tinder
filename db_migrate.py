@@ -57,10 +57,10 @@ def create_migration_history_table(conn):
 
 def execute_migrations(conn):
     # 导入migration列表
-    from core.db_migration.migration_history import migration_history
+    from core.database.migrations.migration_history import migration_history
     """执行迁移脚本"""
     for migration in migration_history:
-        if migration not in os.listdir('core/db_migration/SQL'):
+        if migration not in os.listdir('core/database/migrations/SQL'):
             custom_log("ERROR", f"迁移脚本不存在: {migration}")
             continue
         cursor = conn.cursor()
@@ -71,7 +71,7 @@ def execute_migrations(conn):
             count = cursor.fetchone()[0]
             if count == 0:
                 # 执行迁移脚本
-                with open(f'core/db_migration/SQL/{migration}', 'r') as f:
+                with open(f'core/database/migrations/SQL/{migration}', 'r') as f:
                     sql_script = f.read()
                 cursor.execute(sql_script)
                 # 记录迁移历史

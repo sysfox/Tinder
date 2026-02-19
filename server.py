@@ -1,5 +1,6 @@
 # 引入依赖
 import uvicorn, os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -7,14 +8,26 @@ from datetime import datetime
 import platform
 from typing import Dict, Any
 from core.helper.ContainerCustomLog.index import custom_log
+from core.database.connection.pgsql import pgsql
+from core.database.connection.redis import redis_conn
 
 # 加载环境变量
 load_dotenv()
 os.environ['TZ'] = 'Asia/Shanghai' # 设置时区为上海
 
 
+# 应用生命周期管理：启动时连接数据库，停止时断开
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    pgsql.start()
+    redis_conn.start()
+    yield
+    pgsql.stop()
+    redis_conn.stop()
+
+
 # 创建FastAPI应用
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # 配置CORS中间件
 app.add_middleware(
