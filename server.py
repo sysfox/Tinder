@@ -8,6 +8,7 @@ from datetime import datetime
 import platform
 from typing import Dict, Any
 from core.helper.ContainerCustomLog.index import custom_log
+from core.helper.Firewall.index import FirewallMiddleware
 from core.database.connection.pgsql import pgsql
 from core.database.connection.redis import redis_conn
 
@@ -37,6 +38,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 注册防火墙中间件（在 CORS 之后，路由之前）
+app.add_middleware(FirewallMiddleware)
 # 导入模块
 from modules.index.index import app as index_router
 # 导入路由
