@@ -2,7 +2,7 @@ from typing import Any
 
 import psycopg2.extras
 
-from core.helper.database.connection.pgsql import pgsql
+from core.database.connection.pgsql import pgsql
 
 
 class BaseDAO:

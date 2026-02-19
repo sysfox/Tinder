@@ -1,4 +1,4 @@
-from core.dao.base import BaseDAO
+from core.database.dao.base import BaseDAO
 
 
 class StoresAndRestaurantsDAO(BaseDAO):

@@ -8,8 +8,8 @@ from datetime import datetime
 import platform
 from typing import Dict, Any
 from core.helper.ContainerCustomLog.index import custom_log
-from core.helper.database.connection.pgsql import pgsql
-from core.helper.database.connection.redis import redis_conn
+from core.database.connection.pgsql import pgsql
+from core.database.connection.redis import redis_conn
 
 # 加载环境变量
 load_dotenv()

@@ -2,8 +2,8 @@ from typing import Any
 
 import psycopg2.extras
 
-from core.dao.base import BaseDAO
-from core.helper.database.connection.pgsql import pgsql
+from core.database.dao.base import BaseDAO
+from core.database.connection.pgsql import pgsql
 
 
 class RequestLogsDAO(BaseDAO):
