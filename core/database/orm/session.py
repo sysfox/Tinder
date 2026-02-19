@@ -1,4 +1,4 @@
-"""ORM Session 管理：提供线程安全的 scoped_session 单例。
+"""ORM Session 管理：提供线程安全的 Session 上下文管理器。
 
 典型用法::
 
@@ -19,17 +19,34 @@ from sqlalchemy.orm import Session
 
 from core.database.orm.base import get_engine, get_session_factory
 
-__all__ = ["get_session"]
+__all__ = ["get_session", "dispose_engine"]
 
-# 模块级延迟初始化的工厂，避免在导入时就连接数据库
+# 模块级延迟初始化，避免在导入时就连接数据库
+_engine = None
 _session_factory = None
+
+
+def _get_engine_instance():
+    global _engine
+    if _engine is None:
+        _engine = get_engine()
+    return _engine
 
 
 def _get_factory():
     global _session_factory
     if _session_factory is None:
-        _session_factory = get_session_factory(get_engine())
+        _session_factory = get_session_factory(_get_engine_instance())
     return _session_factory
+
+
+def dispose_engine() -> None:
+    """释放引擎，关闭连接池中的所有连接。在应用停止时调用。"""
+    global _engine, _session_factory
+    if _engine is not None:
+        _engine.dispose()
+        _engine = None
+        _session_factory = None
 
 
 @contextmanager

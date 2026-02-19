@@ -1,36 +1,36 @@
 from typing import Any
 
-import psycopg2.extras
+from sqlalchemy import select
 
 from core.database.dao.base import BaseDAO
-from core.database.connection.pgsql import pgsql
+from core.database.orm.models.illegal_requests import IllegalRequest
+from core.database.orm.session import get_session
 
 
 class IllegalRequestsDAO(BaseDAO):
     """illegal_requests 表的数据访问对象。"""
 
-    TABLE = "illegal_requests"
+    MODEL = IllegalRequest
 
     def find_by_ip(self, ip: str, limit: int = 100) -> list[dict[str, Any]]:
         """查询指定 IP 的所有违规记录。"""
-        conn = pgsql.get_connection()
-        if conn is None:
-            return []
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"SELECT * FROM {self.TABLE} WHERE ip = %s ORDER BY happened_at DESC LIMIT %s",
-                (ip, limit),
+        with get_session() as session:
+            objs = session.scalars(
+                select(IllegalRequest)
+                .where(IllegalRequest.ip == ip)
+                .order_by(IllegalRequest.happened_at.desc())
+                .limit(limit)
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [self._to_dict(o) for o in objs]
 
     def find_by_user(self, user: str, limit: int = 100) -> list[dict[str, Any]]:
         """查询指定用户的所有违规记录。"""
-        conn = pgsql.get_connection()
-        if conn is None:
-            return []
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f'SELECT * FROM {self.TABLE} WHERE "user" = %s ORDER BY happened_at DESC LIMIT %s',
-                (user, limit),
+        with get_session() as session:
+            objs = session.scalars(
+                select(IllegalRequest)
+                .where(IllegalRequest.user == user)
+                .order_by(IllegalRequest.happened_at.desc())
+                .limit(limit)
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [self._to_dict(o) for o in objs]
+

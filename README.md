@@ -62,10 +62,10 @@ docker run -p 1912:1912 tinder
 
 ## ORM 支持
 
-项目从 psycopg2 + 手写 SQL 逐步迁移到 **SQLAlchemy 2.x ORM**，详情见 [数据库文档](docs/database/readme.md#orm-层使用)。
+项目已将数据库访问层从 psycopg2 + 手写 SQL 完全迁移到 **SQLAlchemy 2.x ORM**，详情见 [数据库文档](docs/database/readme.md)。
 
-- ORM 基础设施位于 `core/database/orm/`，包含声明式基类、Session 管理和示例模型。
-- 新表 / 新功能应优先使用 ORM，旧 DAO 暂时保留，不影响现有行为。
+- ORM 基础设施位于 `core/database/orm/`，包含声明式基类、Session 管理和所有表的 ORM 模型。
+- 所有 DAO 均已使用 ORM 实现，接口保持不变。
 
 ## API 文档
 

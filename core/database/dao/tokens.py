@@ -1,36 +1,34 @@
 from typing import Any
 
-import psycopg2.extras
+from sqlalchemy import func, or_, select
 
 from core.database.dao.base import BaseDAO
-from core.database.connection.pgsql import pgsql
+from core.database.orm.models.tokens import Token
+from core.database.orm.session import get_session
 
 
 class TokensDAO(BaseDAO):
     """tokens 表的数据访问对象。"""
 
-    TABLE = "tokens"
+    MODEL = Token
 
     def find_by_belong_to(self, belong_to: str) -> list[dict[str, Any]]:
         """查询指定用户的所有 token。"""
-        conn = pgsql.get_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"SELECT * FROM {self.TABLE} WHERE belong_to = %s", (belong_to,)
+        with get_session() as session:
+            objs = session.scalars(
+                select(Token).where(Token.belong_to == belong_to)
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [self._to_dict(o) for o in objs]
 
     def find_active_by_belong_to(self, belong_to: str) -> list[dict[str, Any]]:
         """查询指定用户的所有未过期 token。"""
-        conn = pgsql.get_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"""
-                SELECT * FROM {self.TABLE}
-                WHERE belong_to = %s
-                  AND (expired_at IS NULL OR expired_at > NOW())
-                  AND current_status != 'revoked'
-                """,
-                (belong_to,),
+        with get_session() as session:
+            objs = session.scalars(
+                select(Token).where(
+                    Token.belong_to == belong_to,
+                    or_(Token.expired_at.is_(None), Token.expired_at > func.now()),
+                    Token.current_status != "revoked",
+                )
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [self._to_dict(o) for o in objs]
+

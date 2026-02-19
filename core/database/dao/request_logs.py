@@ -1,9 +1,11 @@
 from typing import Any
 
-import psycopg2.extras
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from core.database.dao.base import BaseDAO
-from core.database.connection.pgsql import pgsql
+from core.database.orm.models.request_logs import RequestLog
+from core.database.orm.session import get_session
 
 
 class RequestLogsDAO(BaseDAO):
@@ -13,7 +15,7 @@ class RequestLogsDAO(BaseDAO):
     额外提供按 request_path 查询/更新的方法。
     """
 
-    TABLE = "request_logs"
+    MODEL = RequestLog
 
     def find_by_uuid(self, uuid: str) -> dict[str, Any] | None:
         raise NotImplementedError(
@@ -31,38 +33,37 @@ class RequestLogsDAO(BaseDAO):
         )
 
     def find_by_path(self, request_path: str) -> dict[str, Any] | None:
-        conn = pgsql.get_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"SELECT * FROM {self.TABLE} WHERE request_path = %s",
-                (request_path,),
-            )
-            row = cur.fetchone()
-            return dict(row) if row else None
+        with get_session() as session:
+            obj = session.scalars(
+                select(RequestLog).where(RequestLog.request_path == request_path)
+            ).first()
+            return self._to_dict(obj) if obj else None
 
     def upsert_by_path(self, request_path: str) -> dict[str, Any]:
         """若记录不存在则插入，存在则将 frequency 加一。"""
-        conn = pgsql.get_connection()
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"""
-                INSERT INTO {self.TABLE} (request_path, frequency)
-                VALUES (%s, 1)
-                ON CONFLICT (request_path)
-                DO UPDATE SET frequency = {self.TABLE}.frequency + 1
-                RETURNING *
-                """,
-                (request_path,),
+        with get_session() as session:
+            stmt = (
+                pg_insert(RequestLog)
+                .values(request_path=request_path, frequency=1)
+                .on_conflict_do_update(
+                    index_elements=["request_path"],
+                    set_={"frequency": RequestLog.__table__.c.frequency + 1},
+                )
             )
-            conn.commit()
-            return dict(cur.fetchone())
+            session.execute(stmt)
+            session.flush()
+            obj = session.scalars(
+                select(RequestLog).where(RequestLog.request_path == request_path)
+            ).first()
+            return self._to_dict(obj)
 
     def delete_by_path(self, request_path: str) -> bool:
-        conn = pgsql.get_connection()
-        with conn.cursor() as cur:
-            cur.execute(
-                f"DELETE FROM {self.TABLE} WHERE request_path = %s",
-                (request_path,),
-            )
-            conn.commit()
-            return cur.rowcount > 0
+        with get_session() as session:
+            obj = session.scalars(
+                select(RequestLog).where(RequestLog.request_path == request_path)
+            ).first()
+            if obj is None:
+                return False
+            session.delete(obj)
+            return True
+

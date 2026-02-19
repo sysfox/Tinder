@@ -39,22 +39,22 @@ REDIS_URL=redis://localhost:6379/0
 
 ## 数据库连接管理
 
-连接管理器位于 `core/helper/database/connection/`。应用启动时自动连接，停止时自动断开；若连接中途断开，后台线程将以指数退避策略（初始 2 秒，最大 60 秒）持续尝试重连。
+PostgreSQL 连接由 SQLAlchemy Engine 统一管理，应用启动时自动验证连接，停止时调用 `dispose_engine()` 关闭连接池。Redis 连接管理器独立运行。
 
-### PostgreSQL
+### PostgreSQL（ORM 引擎）
 
 ```python
-from core.helper.database.connection.pgsql import pgsql
+from core.database.orm.session import get_session
 
-# 获取原生 psycopg2 连接对象
-conn = pgsql.get_connection()
+with get_session() as session:
+    # 在 session 内执行 ORM 操作
+    ...
 ```
 
-| 方法 | 说明 |
-|------|------|
-| `pgsql.start()` | 建立连接并启动后台监控线程（由应用 lifespan 自动调用） |
-| `pgsql.stop()` | 停止监控并关闭连接（由应用 lifespan 自动调用） |
-| `pgsql.get_connection()` | 返回当前活跃的 `psycopg2` 连接，未连接时返回 `None` |
+| 函数/方法 | 说明 |
+|-----------|------|
+| `get_session()` | 上下文管理器，提供线程安全的 SQLAlchemy Session |
+| `dispose_engine()` | 释放连接池（由应用 lifespan 自动调用） |
 
 ### Redis
 
@@ -77,7 +77,7 @@ value = client.get("key")
 
 ## DAO 层使用
 
-所有 DAO 位于 `core/dao/`，继承自 `core/dao/base.py` 的 `BaseDAO`。
+所有 DAO 位于 `core/database/dao/`，继承自 `core/database/dao/base.py` 的 `BaseDAO`，底层使用 **SQLAlchemy 2.x ORM**。
 
 ### 通用 CRUD
 
@@ -142,91 +142,68 @@ success = dao.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 ---
 
-## ORM 层使用
+## ORM 层
 
-### 背景与目标
-
-现有 DAO 层基于 psycopg2 + 手写 SQL，在功能迭代加速的背景下，维护成本逐渐增加。为此，项目引入 **SQLAlchemy 2.x ORM**，目标如下：
-
-- 通过声明式模型替代手写 SQL，提升可维护性与类型安全性。
-- 借助 ORM 的懒加载、关联关系等特性，降低复杂查询的编写难度。
-- 渐进式迁移：旧 DAO 保留不变，新功能优先使用 ORM；待全量迁移完成后再统一移除旧 DAO。
+所有 DAO 已全量迁移至 SQLAlchemy 2.x ORM，原 psycopg2 手写 SQL 层已移除。
 
 ### 目录结构
 
 ```
 core/database/orm/
 ├── __init__.py
-├── base.py            # DeclarativeBase + Engine/Session 工厂
-├── session.py         # 上下文管理器 get_session()
-├── models/
-│   ├── __init__.py
-│   ├── users.py       # User ORM 模型
-│   └── tokens.py      # Token ORM 模型
-└── repositories/
-    ├── __init__.py
-    └── users.py       # UsersRepository（ORM 版 DAO）
+├── base.py        # DeclarativeBase + Engine/Session 工厂
+├── session.py     # get_session() 上下文管理器、dispose_engine()
+└── models/        # 每个表对应一个 ORM 模型文件
+    ├── users.py
+    ├── tokens.py
+    ├── comments.py
+    ├── favourites.py
+    ├── illegal_requests.py
+    ├── personal_logs.py
+    ├── relations.py
+    ├── request_logs.py
+    ├── song_arrangements.py
+    ├── songs.py
+    ├── stores_and_restaurants.py
+    ├── system_logs.py
+    ├── system_reports.py
+    ├── tags.py
+    ├── tasks.py
+    ├── vote.py
+    ├── wall_looking_for.py
+    └── wall_sayings.py
 ```
-
-### UsersRepository 示例
-
-```python
-from core.database.orm.repositories.users import UsersRepository
-
-repo = UsersRepository()
-
-# 查询单条（按 uuid）
-user = repo.get_by_uuid("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-
-# 分页查询
-users = repo.find_all(limit=20, offset=0)
-
-# 插入
-new_user = repo.create({
-    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "nickname": "张三",
-    "user_role": "user",
-})
-
-# 更新
-updated = repo.update("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", {"nickname": "李四"})
-
-# 删除
-success = repo.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-```
-
-所有方法的返回格式（`dict[str, Any]`）与现有 psycopg2 DAO 保持一致，便于平滑迁移。
 
 ### 开发规范
 
 1. **新表必须先写 ORM 模型**：在 `core/database/orm/models/` 中新增模型文件，字段定义与 SQL 迁移文件保持一致。
-2. **新功能使用 Repository**：在 `core/database/orm/repositories/` 中新增 Repository 类，提供业务方法。
-3. **旧 DAO 暂不删除**：现有 psycopg2 DAO 继续正常工作，直到全量 ORM 迁移完成。
-4. **Session 生命周期**：始终通过 `get_session()` 上下文管理器使用 Session，禁止在函数外持有 Session 引用。
+2. **新 DAO 继承 BaseDAO**：在 `core/database/dao/` 中新增 DAO 文件，设置 `MODEL` 属性指向对应的 ORM 模型类。
+3. **Session 生命周期**：始终通过 `get_session()` 上下文管理器使用 Session，禁止在函数外持有 Session 引用。
 
 ---
 
 ## 表结构一览
 
-| DAO 文件 | 表名 | 说明 |
-|----------|------|------|
-| `users.py` | `users` | 用户信息 |
-| `tokens.py` | `tokens` | 认证令牌 |
-| `tags.py` | `tags` | 标签 |
-| `relations.py` | `relations` | 标签关联关系 |
-| `songs.py` | `songs` | 歌曲 |
-| `song_arrangements.py` | `song_arrangements` | 歌曲编排 |
-| `vote.py` | `vote` | 投票 |
-| `comments.py` | `comments` | 评论 |
-| `favourites.py` | `favourites` | 收藏 |
-| `wall_sayings.py` | `wall_sayings` | 表白墙留言 |
-| `wall_looking_for.py` | `wall_looking_for` | 寻人/寻物墙 |
-| `stores_and_restaurants.py` | `stores_and_restaurants` | 商铺与餐厅 |
-| `tasks.py` | `tasks` | 任务 |
-| `personal_logs.py` | `personal_logs` | 用户操作日志 |
-| `request_logs.py` | `request_logs` | 接口请求统计 |
-| `system_logs.py` | `system_logs` | 系统日志 |
-| `system_reports.py` | `system_reports` | 系统报告 |
+| DAO 文件 | ORM 模型 | 表名 | 说明 |
+|----------|----------|------|------|
+| `users.py` | `User` | `users` | 用户信息 |
+| `tokens.py` | `Token` | `tokens` | 认证令牌 |
+| `tags.py` | `Tag` | `tags` | 标签 |
+| `relations.py` | `Relation` | `relations` | 标签关联关系 |
+| `songs.py` | `Song` | `songs` | 歌曲 |
+| `song_arrangements.py` | `SongArrangement` | `song_arrangements` | 歌曲编排 |
+| `vote.py` | `Vote` | `vote` | 投票 |
+| `comments.py` | `Comment` | `comments` | 评论 |
+| `favourites.py` | `Favourite` | `favourites` | 收藏 |
+| `wall_sayings.py` | `WallSaying` | `wall_sayings` | 表白墙留言 |
+| `wall_looking_for.py` | `WallLookingFor` | `wall_looking_for` | 寻人/寻物墙 |
+| `stores_and_restaurants.py` | `StoreOrRestaurant` | `stores_and_restaurants` | 商铺与餐厅 |
+| `tasks.py` | `Task` | `tasks` | 任务 |
+| `personal_logs.py` | `PersonalLog` | `personal_logs` | 用户操作日志 |
+| `request_logs.py` | `RequestLog` | `request_logs` | 接口请求统计 |
+| `system_logs.py` | `SystemLog` | `system_logs` | 系统日志 |
+| `system_reports.py` | `SystemReport` | `system_reports` | 系统报告 |
+| `illegal_requests.py` | `IllegalRequest` | `illegal_requests` | 违规请求记录 |
 
 ---
 
