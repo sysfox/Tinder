@@ -60,6 +60,12 @@ docker run -p 1912:1912 tinder
 └── requirements.txt # 项目依赖
 ```
 
+## ORM 支持
+
+项目数据库访问层使用 **SQLAlchemy 2.x ORM**。每个 DAO 文件（`core/database/dao/`）同时包含 ORM 模型定义与 DAO 类，ORM 基础设施（`Base`、`get_session`、`dispose_engine`）统一位于 `core/database/connection/db.py`。
+
+详情见 [数据库文档](docs/database/readme.md)。
+
 ## API 文档
 
 启动服务后访问 `http://localhost:1912/docs` 查看Swagger文档

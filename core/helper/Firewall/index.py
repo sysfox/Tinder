@@ -3,12 +3,10 @@ import uuid as uuid_lib
 from datetime import datetime
 from typing import Callable
 
-import psycopg2.extras
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from core.database.connection.pgsql import pgsql
 from core.database.connection.redis import redis_conn
 from core.helper.ContainerCustomLog.index import custom_log
 
@@ -85,18 +83,19 @@ def _get_client_ip(request: Request) -> str:
 def _resolve_user_from_token(token: str) -> str:
     """通过 token 查询其所有者 uuid，失败时返回 'unknown'。"""
     try:
-        conn = pgsql.get_connection()
-        if conn is None:
-            return "unknown"
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "SELECT belong_to FROM tokens WHERE uuid = %s"
-                " AND (expired_at IS NULL OR expired_at > NOW())"
-                " AND current_status != 'revoked'",
-                (token,),
+        from sqlalchemy import func, or_, select
+
+        from core.database.connection.db import get_session
+        from core.database.dao.tokens import Token
+
+        with get_session() as session:
+            stmt = select(Token.belong_to).where(
+                Token.uuid == token,
+                or_(Token.expired_at.is_(None), Token.expired_at > func.now()),
+                Token.current_status != "revoked",
             )
-            row = cur.fetchone()
-            return row["belong_to"] if row else "unknown"
+            result = session.scalars(stmt).first()
+            return result if result else "unknown"
     except Exception:
         return "unknown"
 
@@ -118,23 +117,22 @@ def _record_illegal_request(
 ) -> None:
     """将违规请求写入 illegal_requests 表，失败时仅打印日志不中断流程。"""
     try:
-        conn = pgsql.get_connection()
-        if conn is None:
-            return
-        record_uuid = str(uuid_lib.uuid4())
-        with conn.cursor() as cur:
-            cur.execute(
-                'INSERT INTO illegal_requests (uuid, "user", happened_at, type, path, ip, ua)'
-                " VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (record_uuid, user, datetime.now(), attack_type, path, ip, ua),
-            )
-            conn.commit()
+        from core.database.connection.db import get_session
+        from core.database.dao.illegal_requests import IllegalRequest
+
+        record = IllegalRequest(
+            uuid=str(uuid_lib.uuid4()),
+            user=user,
+            happened_at=datetime.now(),
+            type=attack_type,
+            path=path,
+            ip=ip,
+            ua=ua,
+        )
+        with get_session() as session:
+            session.add(record)
     except Exception as exc:
         custom_log("ERROR", f"[Firewall] 写入 illegal_requests 失败: {exc}")
-        try:
-            conn.rollback()
-        except Exception:
-            pass
 
 
 def _increment_violation(ip: str) -> int:

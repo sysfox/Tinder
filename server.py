@@ -9,8 +9,8 @@ import platform
 from typing import Dict, Any
 from core.helper.ContainerCustomLog.index import custom_log
 from core.helper.Firewall.index import FirewallMiddleware
-from core.database.connection.pgsql import pgsql
 from core.database.connection.redis import redis_conn
+from core.database.connection.db import dispose_engine, get_session
 
 # 加载环境变量
 load_dotenv()
@@ -20,10 +20,17 @@ os.environ['TZ'] = 'Asia/Shanghai' # 设置时区为上海
 # 应用生命周期管理：启动时连接数据库，停止时断开
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    pgsql.start()
+    from sqlalchemy import text
+    try:
+        with get_session() as session:
+            session.execute(text("SELECT 1"))
+        custom_log("SUCCESS", "PostgreSQL 连接成功")
+    except Exception as exc:
+        custom_log("ERROR", f"PostgreSQL 连接失败: {exc}")
     redis_conn.start()
     yield
-    pgsql.stop()
+    dispose_engine()
+    custom_log("SUCCESS", "PostgreSQL 连接已关闭")
     redis_conn.stop()
 
 

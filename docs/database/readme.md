@@ -13,6 +13,7 @@
 - [DAO 层使用](#dao-层使用)
   - [通用 CRUD](#通用-crud)
   - [特殊 DAO 说明](#特殊-dao-说明)
+- [开发规范](#开发规范)
 - [表结构一览](#表结构一览)
 - [ER 图](#er-图)
 
@@ -34,27 +35,28 @@ REDIS_URL=redis://localhost:6379/0
 
 ## 数据库连接管理
 
-连接管理器位于 `core/helper/database/connection/`。应用启动时自动连接，停止时自动断开；若连接中途断开，后台线程将以指数退避策略（初始 2 秒，最大 60 秒）持续尝试重连。
+PostgreSQL 连接由 SQLAlchemy Engine 统一管理，ORM 基础设施位于 `core/database/connection/db.py`。
+应用启动时自动验证连接，停止时调用 `dispose_engine()` 关闭连接池。Redis 连接管理器独立运行。
 
 ### PostgreSQL
 
 ```python
-from core.helper.database.connection.pgsql import pgsql
+from core.database.connection.db import get_session
 
-# 获取原生 psycopg2 连接对象
-conn = pgsql.get_connection()
+with get_session() as session:
+    # 在 session 内执行 ORM 操作
+    ...
 ```
 
-| 方法 | 说明 |
+| 函数 | 说明 |
 |------|------|
-| `pgsql.start()` | 建立连接并启动后台监控线程（由应用 lifespan 自动调用） |
-| `pgsql.stop()` | 停止监控并关闭连接（由应用 lifespan 自动调用） |
-| `pgsql.get_connection()` | 返回当前活跃的 `psycopg2` 连接，未连接时返回 `None` |
+| `get_session()` | 上下文管理器，提供自动提交/回滚的 SQLAlchemy Session |
+| `dispose_engine()` | 释放连接池（由应用 lifespan 自动调用） |
 
 ### Redis
 
 ```python
-from core.helper.database.connection.redis import redis_conn
+from core.database.connection.redis import redis_conn
 
 # 获取 redis-py 客户端
 client = redis_conn.get_client()
@@ -72,14 +74,28 @@ value = client.get("key")
 
 ## DAO 层使用
 
-所有 DAO 位于 `core/dao/`，继承自 `core/dao/base.py` 的 `BaseDAO`。
+所有 DAO 位于 `core/database/dao/`，每个文件同时包含 **ORM 模型定义** 和 **DAO 类**，继承自 `BaseDAO`。底层使用 **SQLAlchemy 2.x ORM**，无手写 SQL。
+
+项目目录结构：
+
+```
+core/database/
+├── connection/
+│   ├── db.py      # ORM 基础设施：Base、get_session()、dispose_engine()
+│   └── redis.py   # Redis 连接管理
+└── dao/
+    ├── base.py    # BaseDAO（通用 CRUD，子类设置 MODEL 即可）
+    ├── users.py   # User 模型 + UsersDAO
+    ├── tokens.py  # Token 模型 + TokensDAO
+    └── ...        # 每个表一个文件（模型 + DAO 合一）
+```
 
 ### 通用 CRUD
 
 以 `UsersDAO` 为例：
 
 ```python
-from core.dao.users import UsersDAO
+from core.database.dao.users import UsersDAO
 
 dao = UsersDAO()
 
@@ -137,27 +153,63 @@ success = dao.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 ---
 
+## 开发规范
+
+新增表/功能时：
+
+1. **在 `core/database/dao/` 中新建 DAO 文件**，在同一文件内定义 ORM 模型类（继承 `Base`）和 DAO 类（继承 `BaseDAO`，设置 `MODEL` 属性）。
+2. **字段定义与 SQL 迁移文件保持一致**：在 `core/database/migrations/SQL/` 中同步新增迁移文件。
+3. **Session 生命周期**：始终通过 `get_session()` 上下文管理器使用 Session，禁止在函数外持有 Session 引用。
+
+新建 DAO 示例：
+
+```python
+# core/database/dao/example.py
+
+from sqlalchemy import Integer, Text, func
+from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.orm import Mapped, mapped_column
+
+from core.database.connection.db import Base
+from core.database.dao.base import BaseDAO
+
+
+class Example(Base):
+    __tablename__ = "example"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uuid: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    # ... 其他字段
+
+
+class ExampleDAO(BaseDAO):
+    MODEL = Example
+```
+
+---
+
 ## 表结构一览
 
-| DAO 文件 | 表名 | 说明 |
-|----------|------|------|
-| `users.py` | `users` | 用户信息 |
-| `tokens.py` | `tokens` | 认证令牌 |
-| `tags.py` | `tags` | 标签 |
-| `relations.py` | `relations` | 标签关联关系 |
-| `songs.py` | `songs` | 歌曲 |
-| `song_arrangements.py` | `song_arrangements` | 歌曲编排 |
-| `vote.py` | `vote` | 投票 |
-| `comments.py` | `comments` | 评论 |
-| `favourites.py` | `favourites` | 收藏 |
-| `wall_sayings.py` | `wall_sayings` | 表白墙留言 |
-| `wall_looking_for.py` | `wall_looking_for` | 寻人/寻物墙 |
-| `stores_and_restaurants.py` | `stores_and_restaurants` | 商铺与餐厅 |
-| `tasks.py` | `tasks` | 任务 |
-| `personal_logs.py` | `personal_logs` | 用户操作日志 |
-| `request_logs.py` | `request_logs` | 接口请求统计 |
-| `system_logs.py` | `system_logs` | 系统日志 |
-| `system_reports.py` | `system_reports` | 系统报告 |
+| DAO 文件 | ORM 模型 | 表名 | 说明 |
+|----------|----------|------|------|
+| `users.py` | `User` | `users` | 用户信息 |
+| `tokens.py` | `Token` | `tokens` | 认证令牌 |
+| `tags.py` | `Tag` | `tags` | 标签 |
+| `relations.py` | `Relation` | `relations` | 标签关联关系 |
+| `songs.py` | `Song` | `songs` | 歌曲 |
+| `song_arrangements.py` | `SongArrangement` | `song_arrangements` | 歌曲编排 |
+| `vote.py` | `Vote` | `vote` | 投票 |
+| `comments.py` | `Comment` | `comments` | 评论 |
+| `favourites.py` | `Favourite` | `favourites` | 收藏 |
+| `wall_sayings.py` | `WallSaying` | `wall_sayings` | 表白墙留言 |
+| `wall_looking_for.py` | `WallLookingFor` | `wall_looking_for` | 寻人/寻物墙 |
+| `stores_and_restaurants.py` | `StoreOrRestaurant` | `stores_and_restaurants` | 商铺与餐厅 |
+| `tasks.py` | `Task` | `tasks` | 任务 |
+| `personal_logs.py` | `PersonalLog` | `personal_logs` | 用户操作日志 |
+| `request_logs.py` | `RequestLog` | `request_logs` | 接口请求统计 |
+| `system_logs.py` | `SystemLog` | `system_logs` | 系统日志 |
+| `system_reports.py` | `SystemReport` | `system_reports` | 系统报告 |
+| `illegal_requests.py` | `IllegalRequest` | `illegal_requests` | 违规请求记录 |
 
 ---
 
@@ -165,3 +217,4 @@ success = dao.delete("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 - `database-schema.excalidraw` – 数据库表结构 ER 图（可在 [excalidraw.com](https://excalidraw.com) 打开）
 - `../db-migration.excalidraw` – 数据库迁移流程图
+
