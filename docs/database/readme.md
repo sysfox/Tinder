@@ -216,5 +216,5 @@ class ExampleDAO(BaseDAO):
 ## ER 图
 
 - `database-schema.excalidraw` – 数据库表结构 ER 图（可在 [excalidraw.com](https://excalidraw.com) 打开）
-- `../db-migration.excalidraw` – 数据库迁移流程图
+- `db-migration.excalidraw` – 数据库迁移流程图
 
