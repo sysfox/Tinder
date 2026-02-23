@@ -63,3 +63,8 @@ docker run -p 1912:1912 tinder
 ## API 文档
 
 启动服务后访问 `http://localhost:1912/docs` 查看Swagger文档
+
+## 架构文档
+
+- [`docs/system-architecture.excalidraw`](docs/system-architecture.excalidraw) – 系统整体架构图（可在 [excalidraw.com](https://excalidraw.com) 打开）
+- [`docs/database/`](docs/database/) – 数据库设计文档与 ER 图
