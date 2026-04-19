@@ -15,6 +15,7 @@
   - [特殊 DAO 说明](#特殊-dao-说明)
 - [开发规范](#开发规范)
 - [表结构一览](#表结构一览)
+- [字段详细说明](#字段详细说明)
 - [ER 图](#er-图)
 
 ---
@@ -224,8 +225,13 @@ class ExampleDAO(BaseDAO):
 
 ---
 
+## 字段详细说明
+
+- 详见：[`table-fields.md`](./table-fields.md)
+
+---
+
 ## ER 图
 
 - `database-schema.excalidraw` – 数据库表结构 ER 图（可在 [excalidraw.com](https://excalidraw.com) 打开）
 - `../db-migration.excalidraw` – 数据库迁移流程图
-
